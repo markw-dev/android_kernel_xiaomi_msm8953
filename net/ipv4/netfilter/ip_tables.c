@@ -4,6 +4,7 @@
  * Copyright (C) 1999 Paul `Rusty' Russell & Michael J. Neuling
  * Copyright (C) 2000-2005 Netfilter Core Team <coreteam@netfilter.org>
  * Copyright (C) 2006-2010 Patrick McHardy <kaber@trash.net>
+ * Copyright (C) 2017 XiaoMi, Inc.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -951,7 +952,7 @@ copy_entries_to_user(unsigned int total_size,
 
 	/* FIXME: use iterator macros --RR */
 	/* ... then go back and fix counters and names */
-	for (off = 0, num = 0; off < total_size; off += e->next_offset, num++){
+	for (off = 0, num = 0; off < total_size; off += e->next_offset, num++) {
 		unsigned int i;
 		const struct xt_entry_match *m;
 		const struct xt_entry_target *t;

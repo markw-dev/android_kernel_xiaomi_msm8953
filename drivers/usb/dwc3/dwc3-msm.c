@@ -1,4 +1,5 @@
 /* Copyright (c) 2012-2017, The Linux Foundation. All rights reserved.
+ * Copyright (C) 2017 XiaoMi, Inc.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -52,7 +53,8 @@
 #include "debug.h"
 #include "xhci.h"
 
-#define DWC3_IDEV_CHG_MAX 1500
+#define DWC3_IDEV_CHG_MAX 2000
+#define DWC3_IDEV_SDP_CHG_MAX 500
 #define DWC3_HVDCP_CHG_MAX 1800
 
 /* AHB2PHY register offsets */
@@ -2678,6 +2680,33 @@ static int dwc3_msm_get_clk_gdsc(struct dwc3_msm *mdwc)
 	return 0;
 }
 
+static int usb_oem_is_kpoc;
+
+int into_charger_mode(struct dwc3_msm *mdwc)
+{
+	int ret;
+	char *cmdline_fastmmi = NULL;
+	char *temp;
+
+	cmdline_fastmmi = strstr(saved_command_line, "androidboot.mode=");
+	if (cmdline_fastmmi != NULL) {
+		temp = cmdline_fastmmi + strlen("androidboot.mode=");
+		ret = strncmp(temp, "charger", strlen("charger"));
+		if (ret == 0) {
+			pr_err("into charger mode\n");
+			usb_oem_is_kpoc = 1;
+			return 1;/* charger mode*/
+		} else {
+			pr_err("others modes\n");
+			usb_oem_is_kpoc = 0;
+			return 2;/* Others mode*/
+		}
+	}
+	pr_err("has no androidboot.mode \n");
+	return 0;
+}
+
+
 static int dwc3_msm_probe(struct platform_device *pdev)
 {
 	struct device_node *node = pdev->dev.of_node, *dwc3_node;
@@ -3349,6 +3378,8 @@ skip_psy_type:
 
 	if (mdwc->chg_type == DWC3_CDP_CHARGER)
 		mA = DWC3_IDEV_CHG_MAX;
+	else
+		mA = DWC3_IDEV_SDP_CHG_MAX;
 
 	/* Save bc1.2 max_curr if type-c charger later moves to diff mode */
 	mdwc->bc1p2_current_max = mA;
@@ -3525,6 +3556,16 @@ static void dwc3_otg_sm_work(struct work_struct *w)
 				break;
 			case DWC3_CDP_CHARGER:
 			case DWC3_SDP_CHARGER:
+
+			if (usb_oem_is_kpoc) {
+				 mdwc->chg_type = DWC3_DCP_CHARGER;
+				 mdwc->otg_state = OTG_STATE_B_IDLE;
+				 dwc3_msm_gadget_vbus_draw(mdwc, 500);
+				 work = 0;
+				 atomic_set(&dwc->in_lpm, 1);
+				 pm_relax(mdwc->dev);
+				 pm_runtime_put_sync(mdwc->dev);
+			} else {
 				atomic_set(&dwc->in_lpm, 0);
 				pm_runtime_set_active(mdwc->dev);
 				pm_runtime_enable(mdwc->dev);
@@ -3541,6 +3582,7 @@ static void dwc3_otg_sm_work(struct work_struct *w)
 				dbg_event(0xFF, "Undef SDP",
 					atomic_read(
 					&mdwc->dev->power.usage_count));
+			}
 				break;
 			default:
 				WARN_ON(1);
@@ -3588,6 +3630,18 @@ static void dwc3_otg_sm_work(struct work_struct *w)
 				 * OTG_STATE_B_PERIPHERAL state on cable
 				 * disconnect or in bus suspend.
 				 */
+
+			 if (usb_oem_is_kpoc) {
+				mdwc->chg_type = DWC3_DCP_CHARGER;
+				mdwc->otg_state = OTG_STATE_B_IDLE;
+				dwc3_msm_gadget_vbus_draw(mdwc, 500);
+				work = 0;
+				atomic_set(&dwc->in_lpm, 1);
+				pm_relax(mdwc->dev);
+				pm_runtime_put_sync(mdwc->dev);
+			 } else {
+				 dwc3_msm_gadget_vbus_draw(mdwc,
+						500);
 				pm_runtime_get_sync(mdwc->dev);
 				dbg_event(0xFF, "CHG gsync",
 					atomic_read(
@@ -3603,6 +3657,7 @@ static void dwc3_otg_sm_work(struct work_struct *w)
 				mdwc->otg_state = OTG_STATE_B_PERIPHERAL;
 				work = 1;
 				break;
+			}
 			/* fall through */
 			default:
 				break;

@@ -7,6 +7,7 @@
  *
  * Copyright (C) 2002 David S. Miller (davem@redhat.com)
  * Copyright (C) 2006-2009 Patrick McHardy <kaber@trash.net>
+ * Copyright (C) 2017 XiaoMi, Inc.
  *
  */
 #define pr_fmt(fmt) KBUILD_MODNAME ": " fmt
@@ -784,7 +785,7 @@ static int copy_entries_to_user(unsigned int total_size,
 
 	/* FIXME: use iterator macros --RR */
 	/* ... then go back and fix counters and names */
-	for (off = 0, num = 0; off < total_size; off += e->next_offset, num++){
+	for (off = 0, num = 0; off < total_size; off += e->next_offset, num++) {
 		const struct xt_entry_target *t;
 
 		e = (struct arpt_entry *)(loc_cpu_entry + off);

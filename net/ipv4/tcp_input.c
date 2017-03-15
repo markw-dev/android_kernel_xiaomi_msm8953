@@ -478,10 +478,10 @@ EXPORT_SYMBOL(tcp_initialize_rcv_mss);
  *
  * The algorithm for RTT estimation w/o timestamps is based on
  * Dynamic Right-Sizing (DRS) by Wu Feng and Mike Fisk of LANL.
- * <http://public.lanl.gov/radiant/pubs.html#DRS>
+ * <http:
  *
  * More detail on this code can be found at
- * <http://staff.psc.edu/jheffner/>,
+ * <http:
  * though this reference is out of date.  A new paper
  * is pending.
  */
