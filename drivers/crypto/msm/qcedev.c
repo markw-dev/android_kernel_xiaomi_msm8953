@@ -1,6 +1,7 @@
 /* Qualcomm CE device driver.
  *
  * Copyright (c) 2010-2016, The Linux Foundation. All rights reserved.
+ * Copyright (C) 2017 XiaoMi, Inc.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -1515,6 +1516,36 @@ static int qcedev_check_cipher_params(struct qcedev_cipher_op_req *req,
 		pr_err("%s: Total src(%d) buf size != data_len (%d)\n",
 			__func__, total, req->data_len);
 		goto error;
+	}
+	/* Verify Source Address's */
+	for (i = 0, total = 0; i < req->entries; i++) {
+		if (total < req->data_len) {
+			if (!access_ok(VERIFY_READ,
+				(void __user *)req->vbuf.src[i].vaddr,
+					req->vbuf.src[i].len)) {
+					pr_err("%s:SRC RD_VERIFY err %d=0x%lx\n",
+						__func__, i, (uintptr_t)
+							req->vbuf.src[i].vaddr);
+					goto error;
+			}
+			total += req->vbuf.src[i].len;
+		}
+	}
+
+	/* Verify Destination Address's */
+	for (i = 0, total = 0; i < QCEDEV_MAX_BUFFERS; i++) {
+		if ((req->vbuf.dst[i].vaddr != 0) &&
+			(total < req->data_len)) {
+			if (!access_ok(VERIFY_WRITE,
+				(void __user *)req->vbuf.dst[i].vaddr,
+					req->vbuf.dst[i].len)) {
+					pr_err("%s:DST WR_VERIFY err %d=0x%lx\n",
+						__func__, i, (uintptr_t)
+							req->vbuf.dst[i].vaddr);
+					goto error;
+			}
+			total += req->vbuf.dst[i].len;
+		}
 	}
 	return 0;
 error:

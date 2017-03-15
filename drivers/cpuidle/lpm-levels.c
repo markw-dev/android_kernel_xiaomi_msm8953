@@ -1,4 +1,5 @@
 /* Copyright (c) 2012-2016, The Linux Foundation. All rights reserved.
+ * Copyright (C) 2017 XiaoMi, Inc.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -1382,7 +1383,7 @@ static int lpm_probe(struct platform_device *pdev)
 		ret = -ENOENT;
 		goto failed;
 	}
-
+	register_hotcpu_notifier(&lpm_cpu_nblk);
 	ret = create_cluster_lvl_nodes(lpm_root_node, module_kobj);
 	if (ret) {
 		pr_err("%s(): Failed to create cluster level nodes\n",

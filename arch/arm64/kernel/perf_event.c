@@ -2,6 +2,7 @@
  * PMU support
  *
  * Copyright (C) 2012 ARM Limited
+ * Copyright (C) 2017 XiaoMi, Inc.
  * Author: Will Deacon <will.deacon@arm.com>
  *
  * This code is based heavily on the ARMv7 perf event code.

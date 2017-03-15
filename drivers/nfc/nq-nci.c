@@ -1,4 +1,5 @@
 /* Copyright (c) 2015-2016, The Linux Foundation. All rights reserved.
+ * Copyright (C) 2017 XiaoMi, Inc.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -69,7 +70,6 @@ struct nqx_dev {
 	/* read buffer*/
 	size_t kbuflen;
 	u8 *kbuf;
-
 };
 
 static int nfcc_reboot(struct notifier_block *notifier, unsigned long val,
@@ -162,6 +162,11 @@ static ssize_t nfc_read(struct file *filp, char __user *buf,
 				break;
 			dev_err_ratelimited(&nqx_dev->client->dev, "gpio is low, no need to read data\n");
 		}
+		ret = wait_event_interruptible(nqx_dev->read_wq,
+				gpio_get_value(nqx_dev->irq_gpio));
+		if (ret)
+			goto err;
+		nqx_disable_irq(nqx_dev);
 	}
 
 	tmp = nqx_dev->kbuf;
@@ -284,6 +289,7 @@ int nfc_ioctl_power_states(struct file *filp, unsigned long arg)
 		/* hardware dependent delay */
 		msleep(100);
 	} else if (arg == 1) {
+		nqx_enable_irq(nqx_dev);
 		dev_dbg(&nqx_dev->client->dev,
 			"gpio_set_value enable: %s: info: %p\n",
 			__func__, nqx_dev);
