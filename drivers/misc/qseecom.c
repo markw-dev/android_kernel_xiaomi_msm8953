@@ -4644,15 +4644,6 @@ static int __validate_send_modfd_resp_inputs(struct qseecom_dev_handle *data,
 }
 
 static int __qseecom_send_modfd_resp(struct qseecom_dev_handle *data,
-			void __user *argp, bool is_64bit_addr)
-{
-	struct qseecom_send_modfd_listener_resp resp;
-	struct qseecom_registered_listener_list *this_lstnr = NULL;
-
-	return 0;
-}
-
-static int __qseecom_send_modfd_resp(struct qseecom_dev_handle *data,
 				void __user *argp, bool is_64bit_addr)
 {
 	struct qseecom_send_modfd_listener_resp resp;

@@ -1,4 +1,4 @@
-/* Copyright (c) 2014-2017, The Linux Foundation. All rights reserved.
+/* Copyright (c) 2014-2016, The Linux Foundation. All rights reserved.
  * Copyright (C) 2017 XiaoMi, Inc.
  *
  * This program is free software; you can redistribute it and/or modify
@@ -304,8 +304,7 @@ module_param_named(
 
 struct fg_irq {
 	int			irq;
-	bool			disabled;
-	bool			wakeup;
+	unsigned long		disabled;
 };
 
 enum fg_soc_irq {
@@ -502,7 +501,6 @@ struct fg_chip {
 	int			prev_status;
 	int			health;
 	enum fg_batt_aging_mode	batt_aging_mode;
-	struct alarm		hard_jeita_alarm;
 	/* capacity learning */
 	struct fg_learning_data	learning_data;
 	struct alarm		fg_cap_learning_alarm;
@@ -571,7 +569,6 @@ struct fg_trans {
 	struct fg_chip *chip;
 	struct fg_log_buffer *log; /* log buffer */
 	u8 *data;	/* fg data that is read */
-	struct mutex memif_dfs_lock; /* Prevent thread concurrency */
 };
 
 struct fg_dbgfs {
@@ -1872,25 +1869,6 @@ static int set_prop_sense_type(struct fg_chip *chip, int ext_sense_type)
 	return 0;
 }
 
-#define IGNORE_FALSE_NEGATIVE_ISENSE_BIT	BIT(3)
-static int set_prop_ignore_false_negative_isense(struct fg_chip *chip,
-							bool ignore)
-{
-	int rc;
-
-	rc = fg_mem_masked_write(chip, EXTERNAL_SENSE_SELECT,
-			IGNORE_FALSE_NEGATIVE_ISENSE_BIT,
-			ignore ? IGNORE_FALSE_NEGATIVE_ISENSE_BIT : 0,
-			EXTERNAL_SENSE_OFFSET);
-	if (rc) {
-		pr_err("failed to %s isense false negative ignore rc=%d\n",
-				ignore ? "enable" : "disable", rc);
-		return rc;
-	}
-
-	return 0;
-}
-
 #define EXPONENT_MASK		0xF800
 #define MANTISSA_MASK		0x3FF
 #define SIGN			BIT(10)
@@ -2730,9 +2708,6 @@ static enum power_supply_property fg_power_props[] = {
 	POWER_SUPPLY_PROP_CYCLE_COUNT,
 	POWER_SUPPLY_PROP_CYCLE_COUNT_ID,
 	POWER_SUPPLY_PROP_HI_POWER,
-	POWER_SUPPLY_PROP_IGNORE_FALSE_NEGATIVE_ISENSE,
-	POWER_SUPPLY_PROP_ENABLE_JEITA_DETECTION,
-	POWER_SUPPLY_PROP_SOC_REPORTING_READY,
 };
 
 static int fg_power_get_property(struct power_supply *psy,
@@ -2762,12 +2737,6 @@ static int fg_power_get_property(struct power_supply *psy,
 		break;
 	case POWER_SUPPLY_PROP_CURRENT_NOW:
 		val->intval = get_sram_prop_now(chip, FG_DATA_CURRENT);
-		break;
-	case POWER_SUPPLY_PROP_IGNORE_FALSE_NEGATIVE_ISENSE:
-		val->intval = !chip->allow_false_negative_isense;
-		break;
-	case POWER_SUPPLY_PROP_ENABLE_JEITA_DETECTION:
-		val->intval = chip->use_soft_jeita_irq;
 		break;
 	case POWER_SUPPLY_PROP_VOLTAGE_NOW:
 		val->intval = get_sram_prop_now(chip, FG_DATA_VOLTAGE);
@@ -2825,9 +2794,6 @@ static int fg_power_get_property(struct power_supply *psy,
 		break;
 	case POWER_SUPPLY_PROP_HI_POWER:
 		val->intval = !!chip->bcl_lpm_disabled;
-		break;
-	case POWER_SUPPLY_PROP_SOC_REPORTING_READY:
-		val->intval = !!chip->profile_loaded;
 		break;
 	default:
 		return -EINVAL;
@@ -3797,67 +3763,6 @@ static int fg_power_set_property(struct power_supply *psy,
 	case POWER_SUPPLY_PROP_UPDATE_NOW:
 		if (val->intval)
 			update_sram_data(chip, &unused);
-		break;
-	case POWER_SUPPLY_PROP_IGNORE_FALSE_NEGATIVE_ISENSE:
-		rc = set_prop_ignore_false_negative_isense(chip, !!val->intval);
-		if (rc)
-			pr_err("set_prop_ignore_false_negative_isense failed, rc=%d\n",
-							rc);
-		else
-			chip->allow_false_negative_isense = !val->intval;
-		break;
-	case POWER_SUPPLY_PROP_ENABLE_JEITA_DETECTION:
-		if (chip->use_soft_jeita_irq == !!val->intval) {
-			pr_debug("JEITA irq %s, ignore!\n",
-				chip->use_soft_jeita_irq ?
-				"enabled" : "disabled");
-			break;
-		}
-		chip->use_soft_jeita_irq = !!val->intval;
-		if (chip->use_soft_jeita_irq) {
-			if (chip->batt_irq[JEITA_SOFT_COLD].disabled) {
-				enable_irq(
-					chip->batt_irq[JEITA_SOFT_COLD].irq);
-				chip->batt_irq[JEITA_SOFT_COLD].disabled =
-								false;
-			}
-			if (!chip->batt_irq[JEITA_SOFT_COLD].wakeup) {
-				enable_irq_wake(
-					chip->batt_irq[JEITA_SOFT_COLD].irq);
-				chip->batt_irq[JEITA_SOFT_COLD].wakeup = true;
-			}
-			if (chip->batt_irq[JEITA_SOFT_HOT].disabled) {
-				enable_irq(
-					chip->batt_irq[JEITA_SOFT_HOT].irq);
-				chip->batt_irq[JEITA_SOFT_HOT].disabled = false;
-			}
-			if (!chip->batt_irq[JEITA_SOFT_HOT].wakeup) {
-				enable_irq_wake(
-					chip->batt_irq[JEITA_SOFT_HOT].irq);
-				chip->batt_irq[JEITA_SOFT_HOT].wakeup = true;
-			}
-		} else {
-			if (chip->batt_irq[JEITA_SOFT_COLD].wakeup) {
-				disable_irq_wake(
-					chip->batt_irq[JEITA_SOFT_COLD].irq);
-				chip->batt_irq[JEITA_SOFT_COLD].wakeup = false;
-			}
-			if (!chip->batt_irq[JEITA_SOFT_COLD].disabled) {
-				disable_irq_nosync(
-					chip->batt_irq[JEITA_SOFT_COLD].irq);
-				chip->batt_irq[JEITA_SOFT_COLD].disabled = true;
-			}
-			if (chip->batt_irq[JEITA_SOFT_HOT].wakeup) {
-				disable_irq_wake(
-					chip->batt_irq[JEITA_SOFT_HOT].irq);
-				chip->batt_irq[JEITA_SOFT_HOT].wakeup = false;
-			}
-			if (!chip->batt_irq[JEITA_SOFT_HOT].disabled) {
-				disable_irq_nosync(
-					chip->batt_irq[JEITA_SOFT_HOT].irq);
-				chip->batt_irq[JEITA_SOFT_HOT].disabled = true;
-			}
-		}
 		break;
 	case POWER_SUPPLY_PROP_STATUS:
 		chip->prev_status = chip->status;
@@ -5188,14 +5093,10 @@ wait:
 				get_sram_prop_now(chip, FG_DATA_BATT_ID));
 	profile_node = of_batterydata_get_best_profile(batt_node, "bms",
 							fg_batt_type);
-	if (IS_ERR_OR_NULL(profile_node)) {
-		rc = PTR_ERR(profile_node);
-		if (rc == -EPROBE_DEFER) {
-			goto reschedule;
-		} else {
-			pr_err("couldn't find profile handle rc=%d\n", rc);
-			goto no_profile;
-		}
+	if (!profile_node) {
+		pr_err("couldn't find profile handle\n");
+		rc = -ENODATA;
+		goto no_profile;
 	}
 
 	/* read rslow compensation values if they're available */
@@ -6009,53 +5910,6 @@ static int fg_init_irqs(struct fg_chip *chip)
 			}
 			break;
 		case FG_BATT:
-			chip->batt_irq[JEITA_SOFT_COLD].irq =
-				spmi_get_irq_byname(chip->spmi, spmi_resource,
-						"soft-cold");
-			if (chip->batt_irq[JEITA_SOFT_COLD].irq < 0) {
-				pr_err("Unable to get soft-cold irq\n");
-				rc = -EINVAL;
-				return rc;
-			}
-			rc = devm_request_threaded_irq(chip->dev,
-					chip->batt_irq[JEITA_SOFT_COLD].irq,
-					NULL,
-					fg_jeita_soft_cold_irq_handler,
-					IRQF_TRIGGER_RISING |
-					IRQF_TRIGGER_FALLING |
-					IRQF_ONESHOT,
-					"soft-cold", chip);
-			if (rc < 0) {
-				pr_err("Can't request %d soft-cold: %d\n",
-					chip->batt_irq[JEITA_SOFT_COLD].irq,
-								rc);
-				return rc;
-			}
-			disable_irq(chip->batt_irq[JEITA_SOFT_COLD].irq);
-			chip->batt_irq[JEITA_SOFT_COLD].disabled = true;
-			chip->batt_irq[JEITA_SOFT_HOT].irq =
-				spmi_get_irq_byname(chip->spmi, spmi_resource,
-					"soft-hot");
-			if (chip->batt_irq[JEITA_SOFT_HOT].irq < 0) {
-				pr_err("Unable to get soft-hot irq\n");
-				rc = -EINVAL;
-				return rc;
-			}
-			rc = devm_request_threaded_irq(chip->dev,
-					chip->batt_irq[JEITA_SOFT_HOT].irq,
-					NULL,
-					fg_jeita_soft_hot_irq_handler,
-					IRQF_TRIGGER_RISING |
-					IRQF_TRIGGER_FALLING |
-					IRQF_ONESHOT,
-					"soft-hot", chip);
-			if (rc < 0) {
-				pr_err("Can't request %d soft-hot: %d\n",
-					chip->batt_irq[JEITA_SOFT_HOT].irq, rc);
-				return rc;
-			}
-			disable_irq(chip->batt_irq[JEITA_SOFT_HOT].irq);
-			chip->batt_irq[JEITA_SOFT_HOT].disabled = true;
 			chip->batt_irq[BATT_MISSING].irq = spmi_get_irq_byname(
 					chip->spmi, spmi_resource,
 					"batt-missing");
@@ -6208,7 +6062,6 @@ static int fg_memif_data_open(struct inode *inode, struct file *file)
 	trans->addr = dbgfs_data.addr;
 	trans->chip = dbgfs_data.chip;
 	trans->offset = trans->addr;
-	mutex_init(&trans->memif_dfs_lock);
 
 	file->private_data = trans;
 	return 0;
@@ -6220,7 +6073,6 @@ static int fg_memif_dfs_close(struct inode *inode, struct file *file)
 
 	if (trans && trans->log && trans->data) {
 		file->private_data = NULL;
-		mutex_destroy(&trans->memif_dfs_lock);
 		kfree(trans->log);
 		kfree(trans->data);
 		kfree(trans);
@@ -6378,13 +6230,10 @@ static ssize_t fg_memif_dfs_reg_read(struct file *file, char __user *buf,
 	size_t ret;
 	size_t len;
 
-	mutex_lock(&trans->memif_dfs_lock);
 	/* Is the the log buffer empty */
 	if (log->rpos >= log->wpos) {
-		if (get_log_data(trans) <= 0) {
-			len = 0;
-			goto unlock_mutex;
-		}
+		if (get_log_data(trans) <= 0)
+			return 0;
 	}
 
 	len = min(count, log->wpos - log->rpos);
@@ -6392,8 +6241,7 @@ static ssize_t fg_memif_dfs_reg_read(struct file *file, char __user *buf,
 	ret = copy_to_user(buf, &log->data[log->rpos], len);
 	if (ret == len) {
 		pr_err("error copy sram register values to user\n");
-		len = -EFAULT;
-		goto unlock_mutex;
+		return -EFAULT;
 	}
 
 	/* 'ret' is the number of bytes not copied */
@@ -6401,9 +6249,6 @@ static ssize_t fg_memif_dfs_reg_read(struct file *file, char __user *buf,
 
 	*ppos += len;
 	log->rpos += len;
-
-unlock_mutex:
-	mutex_unlock(&trans->memif_dfs_lock);
 	return len;
 }
 
@@ -6424,20 +6269,14 @@ static ssize_t fg_memif_dfs_reg_write(struct file *file, const char __user *buf,
 	int cnt = 0;
 	u8  *values;
 	size_t ret = 0;
-	char *kbuf;
-	u32 offset;
 
 	struct fg_trans *trans = file->private_data;
-
-	mutex_lock(&trans->memif_dfs_lock);
-	offset = trans->offset;
+	u32 offset = trans->offset;
 
 	/* Make a copy of the user data */
-	kbuf = kmalloc(count + 1, GFP_KERNEL);
-	if (!kbuf) {
-		ret = -ENOMEM;
-		goto unlock_mutex;
-	}
+	char *kbuf = kmalloc(count + 1, GFP_KERNEL);
+	if (!kbuf)
+		return -ENOMEM;
 
 	ret = copy_from_user(kbuf, buf, count);
 	if (ret == count) {
@@ -6476,8 +6315,6 @@ static ssize_t fg_memif_dfs_reg_write(struct file *file, const char __user *buf,
 
 free_buf:
 	kfree(kbuf);
-unlock_mutex:
-	mutex_unlock(&trans->memif_dfs_lock);
 	return ret;
 }
 
@@ -7171,8 +7008,6 @@ static int fg_probe(struct spmi_device *spmi)
 	INIT_WORK(&chip->slope_limiter_work, slope_limiter_work);
 	alarm_init(&chip->fg_cap_learning_alarm, ALARM_BOOTTIME,
 			fg_cap_learning_alarm_cb);
-	alarm_init(&chip->hard_jeita_alarm, ALARM_BOOTTIME,
-			fg_hard_jeita_alarm_cb);
 	init_completion(&chip->sram_access_granted);
 	init_completion(&chip->sram_access_revoked);
 	complete_all(&chip->sram_access_revoked);
