@@ -41,13 +41,13 @@
  *					number of socks to 2*max_files and
  *					the number of skb queueable in the
  *					dgram receiver.
- *		Artur Skawina	:	Hash function optimizations
- *	     Alexey Kuznetsov	:	Full scale SMP. Lot of bugs are introduced 8)
- *	      Malcolm Beattie	:	Set peercred for socketpair
- *	     Michal Ostrowski	:	Module initialization cleanup.
+ *		Artur Skawina   :	Hash function optimizations
+ *	     Alexey Kuznetsov   :	Full scale SMP. Lot of bugs are introduced 8)
+ *	      Malcolm Beattie   :	Set peercred for socketpair
+ *	     Michal Ostrowski   :       Module initialization cleanup.
  *	     Arnaldo C. Melo	:	Remove MOD_{INC,DEC}_USE_COUNT,
- *					the core infrastructure is doing that
- *					for all net proto families now (2.5.69+)
+ *	     				the core infrastructure is doing that
+ *	     				for all net proto families now (2.5.69+)
  *
  *
  * Known differences from reference BSD that was tested:
@@ -208,7 +208,7 @@ static inline void unix_release_addr(struct unix_address *addr)
 /*
  *	Check unix socket name:
  *		- should be not zero length.
- *		- if started by not zero, should be NULL terminated (FS object)
+ *	        - if started by not zero, should be NULL terminated (FS object)
  *		- if started by zero, it is abstract name.
  */
 
@@ -315,7 +315,7 @@ found:
 	spin_unlock(&unix_table_lock);
 	return s;
 }
-/***************************************************************************************************/
+
 /* Support code for asymmetrically connected dgram sockets
  *
  * If a datagram socket is connected to a socket not itself connected
@@ -342,7 +342,7 @@ found:
  */
 
 static int unix_dgram_peer_wake_relay(wait_queue_t *q, unsigned mode, int flags,
-				void *key)
+				      void *key)
 {
 	struct unix_sock *u;
 	wait_queue_head_t *u_sleep;
@@ -350,7 +350,7 @@ static int unix_dgram_peer_wake_relay(wait_queue_t *q, unsigned mode, int flags,
 	u = container_of(q, struct unix_sock, peer_wake);
 
 	__remove_wait_queue(&unix_sk(u->peer_wake.private)->peer_wait,
-			q);
+			    q);
 	u->peer_wake.private = NULL;
 
 	/* relaying can only happen while the wq still exists */
@@ -383,7 +383,7 @@ static int unix_dgram_peer_wake_connect(struct sock *sk, struct sock *other)
 }
 
 static void unix_dgram_peer_wake_disconnect(struct sock *sk,
-					struct sock *other)
+					    struct sock *other)
 {
 	struct unix_sock *u, *u_other;
 
@@ -400,18 +400,18 @@ static void unix_dgram_peer_wake_disconnect(struct sock *sk,
 }
 
 static void unix_dgram_peer_wake_disconnect_wakeup(struct sock *sk,
-						  struct sock *other)
+						   struct sock *other)
 {
 	unix_dgram_peer_wake_disconnect(sk, other);
 	wake_up_interruptible_poll(sk_sleep(sk),
-			  POLLOUT |
-			  POLLWRNORM |
-			  POLLWRBAND);
+				   POLLOUT |
+				   POLLWRNORM |
+				   POLLWRBAND);
 }
 
 /* preconditions:
- *     - unix_peer(sk) == other
- *     - association is stable
+ *	- unix_peer(sk) == other
+ *	- association is stable
  */
 static int unix_dgram_peer_wake_me(struct sock *sk, struct sock *other)
 {
@@ -427,7 +427,7 @@ static int unix_dgram_peer_wake_me(struct sock *sk, struct sock *other)
 
 	return 0;
 }
-/***************************************************************************************************/
+
 static inline int unix_writable(struct sock *sk)
 {
 	return (atomic_read(&sk->sk_wmem_alloc) << 2) <= sk->sk_sndbuf;
@@ -768,7 +768,6 @@ static struct sock *unix_create1(struct net *net, struct socket *sock)
 	mutex_init(&u->readlock); /* single task reading lock */
 	init_waitqueue_head(&u->peer_wait);
 	init_waitqueue_func_entry(&u->peer_wake, unix_dgram_peer_wake_relay);
-
 	unix_insert_socket(unix_sockets_unbound(sk), sk);
 out:
 	if (sk == NULL)
@@ -1511,7 +1510,7 @@ static int unix_attach_fds(struct scm_cookie *scm, struct sk_buff *skb)
 
 	/*
 	 * Need to duplicate file references for the sake of garbage
-	 * collection. Otherwise a socket in the fps might become a
+	 * collection.  Otherwise a socket in the fps might become a
 	 * candidate for GC while the skb is not yet queued.
 	 */
 	UNIXCB(skb).fp = scm_fp_dup(scm->fp);
@@ -1709,12 +1708,7 @@ restart_locked:
 			goto out_unlock;
 	}
 
-	/* other == sk && unix_peer(other) != sk if
-	 * - unix_peer(sk) == NULL, destination address bound to sk
-	 * - unix_peer(sk) == sk by time of get but disconnected before lock
-	 */
-	if (other != sk &&
-	    unlikely(unix_peer(other) != sk && unix_recvq_full(other))) {
+	if (unlikely(unix_peer(other) != sk && unix_recvq_full(other))) {
 		if (timeo) {
 			timeo = unix_wait_for_peer(other, timeo);
 
@@ -2148,7 +2142,7 @@ again:
 			timeo = unix_stream_data_wait(sk, timeo, last);
 
 			if (signal_pending(current)
-			    || mutex_lock_interruptible(&u->readlock)) {
+			    ||  mutex_lock_interruptible(&u->readlock)) {
 				err = sock_intr_errno(timeo);
 				goto out;
 			}
@@ -2508,7 +2502,7 @@ static int unix_seq_show(struct seq_file *seq, void *v)
 {
 
 	if (v == SEQ_START_TOKEN)
-		seq_puts(seq, "Num	 RefCount Protocol Flags    Type St "
+		seq_puts(seq, "Num       RefCount Protocol Flags    Type St "
 			 "Inode Path\n");
 	else {
 		struct sock *s = v;
@@ -2549,10 +2543,10 @@ static int unix_seq_show(struct seq_file *seq, void *v)
 }
 
 static const struct seq_operations unix_seq_ops = {
-	.start	= unix_seq_start,
-	.next	= unix_seq_next,
-	.stop	= unix_seq_stop,
-	.show	= unix_seq_show,
+	.start  = unix_seq_start,
+	.next   = unix_seq_next,
+	.stop   = unix_seq_stop,
+	.show   = unix_seq_show,
 };
 
 static int unix_seq_open(struct inode *inode, struct file *file)

@@ -172,7 +172,7 @@ int ecryptfs_privileged_open(struct file **lower_file,
 		goto out;
 	}
 have_file:
-	if ((*lower_file)->f_op->mmap == NULL && !d_is_dir(lower_dentry)) {
+	if ((*lower_file)->f_op->mmap == NULL) {
 		fput(*lower_file);
 		*lower_file = NULL;
 		rc = -EMEDIUMTYPE;
