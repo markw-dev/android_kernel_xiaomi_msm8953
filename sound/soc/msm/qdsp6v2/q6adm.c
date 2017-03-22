@@ -3184,7 +3184,7 @@ static int adm_unmap_cal_data(int32_t cal_type,
 
 	if (cal_block == NULL) {
 		pr_err("%s: Cal block is NULL!\n",
-			__func__);
+						__func__);
 		goto done;
 	}
 

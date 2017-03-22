@@ -518,7 +518,8 @@ int diag_usb_write(int id, unsigned char *buf, int len, int ctxt)
 
 	spin_lock_irqsave(&usb_info->write_lock, flags);
 	if (diag_usb_buf_tbl_add(usb_info, buf, len, ctxt)) {
-		DIAG_LOG(DIAG_DEBUG_MUX, "ERR! unable to add buf %pK to table\n",
+		DIAG_LOG(DIAG_DEBUG_MUX,
+					"ERR! unable to add buf %pK to table\n",
 			 buf);
 		diagmem_free(driver, req, usb_info->mempool);
 		spin_unlock_irqrestore(&usb_info->write_lock, flags);
