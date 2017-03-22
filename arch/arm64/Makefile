@@ -34,7 +34,8 @@ endif
 CHECKFLAGS	+= -D__aarch64__
 
 ifeq ($(CONFIG_ARM64_ERRATUM_843419), y)
-CFLAGS_MODULE	+= -mcmodel=large
+KBUILD_CFLAGS_MODULE	+= -mcmodel=large
+KBUILD_CFLAGS_MODULE	+= $(call cc-option, -mpc-relative-literal-loads)
 endif
 
 # Default value
