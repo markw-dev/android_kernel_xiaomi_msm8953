@@ -4047,16 +4047,16 @@ void mdss_mdp_set_roi(struct mdss_mdp_ctl *ctl,
 	}
 
 	previous_frame_pu_type = mdss_mdp_get_pu_type(ctl);
-	mdss_mdp_set_mixer_roi(ctl->mixer_left, l_roi);
-	if (ctl->mixer_left)
+	if (ctl->mixer_left) {
+		mdss_mdp_set_mixer_roi(ctl->mixer_left, l_roi);
 		ctl->roi = ctl->mixer_left->roi;
+	}
 
 	if (ctl->mfd->split_mode == MDP_DUAL_LM_DUAL_DISPLAY) {
 		struct mdss_mdp_ctl *sctl = mdss_mdp_get_split_ctl(ctl);
 
-		if (sctl) {
-			mdss_mdp_set_mixer_roi(sctl->mixer_left, r_roi);
-			if (sctl->mixer_left)
+		if (sctl && sctl->mixer_left) {
+				mdss_mdp_set_mixer_roi(sctl->mixer_left, r_roi);
 				sctl->roi = sctl->mixer_left->roi;
 		}
 	} else if (is_dual_lm_single_display(ctl->mfd) && ctl->mixer_right) {
