@@ -2878,7 +2878,7 @@ static int __qseecom_update_cmd_buf(void *msg, bool cleanup,
 					(!cleanup) &&
 					((uint64_t)sg_dma_address(sg_ptr->sgl)
 					>= PHY_ADDR_4G - sg->length)) {
-					pr_err("App %s sgl PA exceeds 4G: phy_addr=%pad, len=%x\n",
+					pr_err("App %s sgl PA exceeds 4G: phy_addr=%pKad, len=%x\n",
 						data->client.app_name,
 						&(sg_dma_address(sg_ptr->sgl)),
 						sg->length);
@@ -2935,7 +2935,7 @@ static int __qseecom_update_cmd_buf(void *msg, bool cleanup,
 						(!cleanup) &&
 						((uint64_t)(sg_dma_address(sg))
 						>= PHY_ADDR_4G - sg->length)) {
-						pr_err("App %s sgl PA exceeds 4G: phy_addr=%pad, len=%x\n",
+						pr_err("App %s sgl PA exceeds 4G: phy_addr=%pKad, len=%x\n",
 							data->client.app_name,
 							&(sg_dma_address(sg)),
 							sg->length);

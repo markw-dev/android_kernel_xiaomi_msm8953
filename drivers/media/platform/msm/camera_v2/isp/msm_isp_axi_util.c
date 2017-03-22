@@ -1921,6 +1921,13 @@ static void msm_isp_get_camif_update_state_and_halt(
 	else
 		*halt = 0;
 
+	if (vfe_dev->axi_data.num_active_stream == stream_cfg_cmd->num_streams
+		&& (stream_cfg_cmd->cmd == STOP_STREAM ||
+		stream_cfg_cmd->cmd == STOP_IMMEDIATELY))
+		*halt = 1;
+	else
+		*halt = 0;
+
 	if ((pix_stream_cnt) &&
 		(axi_data->src_info[VFE_PIX_0].input_mux != EXTERNAL_READ)) {
 		if (cur_pix_stream_cnt == 0 && pix_stream_cnt &&
@@ -1935,12 +1942,10 @@ static void msm_isp_get_camif_update_state_and_halt(
 			else
 				*camif_update = DISABLE_CAMIF;
 		}
-
 		else
 			*camif_update = NO_UPDATE;
 	} else
 		*camif_update = NO_UPDATE;
-
 }
 
 static void msm_isp_update_camif_output_count(
@@ -2624,18 +2629,19 @@ static int msm_isp_stop_axi_stream(struct vfe_device *vfe_dev,
 		wait_for_complete_for_this_stream = 0;
 
 		stream_info->state = STOP_PENDING;
+
 		if (!halt && !ext_read &&
-		!(stream_info->stream_type == BURST_STREAM &&
-		stream_info->runtime_num_burst_capture == 0))
+			!(stream_info->stream_type == BURST_STREAM &&
+			stream_info->runtime_num_burst_capture == 0))
 			wait_for_complete_for_this_stream = 1;
 
 		ISP_DBG("%s: stream 0x%x, vfe %d camif %d halt %d wait %d\n",
-		__func__,
-		stream_info->stream_id,
-		vfe_dev->pdev->id,
-		camif_update,
-		halt,
-		wait_for_complete_for_this_stream);
+			__func__,
+			stream_info->stream_id,
+			vfe_dev->pdev->id,
+			camif_update,
+			halt,
+			wait_for_complete_for_this_stream);
 
 		intf = SRC_TO_INTF(stream_info->stream_src);
 		if (!wait_for_complete_for_this_stream ||
