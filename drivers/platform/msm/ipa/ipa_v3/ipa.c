@@ -797,7 +797,8 @@ static long ipa3_ioctl(struct file *filp, unsigned int cmd, unsigned long arg)
 			retval = -EINVAL;
 			break;
 		}
-		if (ipa3_del_hdr((struct ipa_ioc_del_hdr *)param)) {
+		if (ipa3_del_hdr_by_user((struct ipa_ioc_del_hdr *)param,
+			true)) {
 			retval = -EFAULT;
 			break;
 		}
@@ -1566,8 +1567,8 @@ static long ipa3_ioctl(struct file *filp, unsigned int cmd, unsigned long arg)
 			retval = -EINVAL;
 			break;
 		}
-		if (ipa3_del_hdr_proc_ctx(
-			(struct ipa_ioc_del_hdr_proc_ctx *)param)) {
+		if (ipa3_del_hdr_proc_ctx_by_user(
+			(struct ipa_ioc_del_hdr_proc_ctx *)param, true)) {
 			retval = -EFAULT;
 			break;
 		}
@@ -2991,7 +2992,7 @@ fail_schedule_delayed_work:
 	if (ipa3_ctx->dflt_v4_rt_rule_hdl)
 		__ipa3_del_rt_rule(ipa3_ctx->dflt_v4_rt_rule_hdl);
 	if (ipa3_ctx->excp_hdr_hdl)
-		__ipa3_del_hdr(ipa3_ctx->excp_hdr_hdl);
+		__ipa3_del_hdr(ipa3_ctx->excp_hdr_hdl, false);
 	ipa3_teardown_sys_pipe(ipa3_ctx->clnt_hdl_cmd);
 fail_cmd:
 	return result;
@@ -3003,7 +3004,7 @@ static void ipa3_teardown_apps_pipes(void)
 	ipa3_teardown_sys_pipe(ipa3_ctx->clnt_hdl_data_in);
 	__ipa3_del_rt_rule(ipa3_ctx->dflt_v6_rt_rule_hdl);
 	__ipa3_del_rt_rule(ipa3_ctx->dflt_v4_rt_rule_hdl);
-	__ipa3_del_hdr(ipa3_ctx->excp_hdr_hdl);
+	__ipa3_del_hdr(ipa3_ctx->excp_hdr_hdl, false);
 	ipa3_teardown_sys_pipe(ipa3_ctx->clnt_hdl_cmd);
 }
 
@@ -4070,7 +4071,7 @@ static int ipa3_trigger_fw_loading_mdms(void)
 
 	IPADBG("FWs are available for loading\n");
 
-	result = ipa3_load_fws(fw);
+	result = ipa3_load_fws(fw, ipa3_res.transport_mem_base);
 	if (result) {
 		IPAERR("IPA FWs loading has failed\n");
 		release_firmware(fw);
