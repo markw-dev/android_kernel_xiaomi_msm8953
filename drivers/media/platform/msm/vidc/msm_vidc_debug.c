@@ -267,10 +267,12 @@ static ssize_t inst_info_read(struct file *file, char __user *buf,
 {
 	struct msm_vidc_inst *inst = file->private_data;
 	int i, j;
+
 	if (!inst) {
 		dprintk(VIDC_ERR, "Invalid params, core: %pK\n", inst);
 		return 0;
 	}
+
 	INIT_DBG_BUF(dbg_buf);
 	write_str(&dbg_buf, "===============================\n");
 	write_str(&dbg_buf, "INSTANCE: %pK (%s)\n", inst,

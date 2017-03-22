@@ -4153,8 +4153,8 @@ static int qseecom_reentrancy_send_resp(struct qseecom_dev_handle *data)
 }
 
 static int __validate_send_modfd_resp_inputs(struct qseecom_dev_handle *data,
-		struct qseecom_send_modfd_listener_resp *resp,
-		struct qseecom_registered_listener_list *this_lstnr)
+			struct qseecom_send_modfd_listener_resp *resp,
+			struct qseecom_registered_listener_list *this_lstnr)
 {
 	int i;
 
@@ -4179,20 +4179,19 @@ static int __validate_send_modfd_resp_inputs(struct qseecom_dev_handle *data,
 		return -EINVAL;
 	}
 	if ((uintptr_t)this_lstnr->user_virt_sb_base >
-			(ULONG_MAX - this_lstnr->sb_length)) {
+					(ULONG_MAX - this_lstnr->sb_length)) {
 		pr_err("Integer overflow in user_virt_sb_base & sb_length\n");
 		return -EINVAL;
 	}
-
 	/* validate resp buf */
 	if (((uintptr_t)resp->resp_buf_ptr <
-			(uintptr_t)this_lstnr->user_virt_sb_base) ||
-			((uintptr_t)resp->resp_buf_ptr >=
-			((uintptr_t)this_lstnr->user_virt_sb_base +
-			this_lstnr->sb_length)) ||
-			(((uintptr_t)resp->resp_buf_ptr + resp->resp_len) >
-			((uintptr_t)this_lstnr->user_virt_sb_base +
-			this_lstnr->sb_length))) {
+		(uintptr_t)this_lstnr->user_virt_sb_base) ||
+		((uintptr_t)resp->resp_buf_ptr >=
+		((uintptr_t)this_lstnr->user_virt_sb_base +
+				this_lstnr->sb_length)) ||
+		(((uintptr_t)resp->resp_buf_ptr + resp->resp_len) >
+		((uintptr_t)this_lstnr->user_virt_sb_base +
+						this_lstnr->sb_length))) {
 		pr_err("resp buf is out of shared buffer region\n");
 		return -EINVAL;
 	}
