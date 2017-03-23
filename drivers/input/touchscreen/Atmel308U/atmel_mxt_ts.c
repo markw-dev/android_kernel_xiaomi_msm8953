@@ -5478,7 +5478,9 @@ static int fb_notifier_cb(struct notifier_block *self,
 
 	if (evdata && evdata->data && event == FB_EVENT_BLANK && mxt_data) {
 		blank = evdata->data;
-		if (*blank == FB_BLANK_UNBLANK) {
+		if (*blank == FB_BLANK_UNBLANK
+                || *blank == FB_BLANK_NORMAL
+                || *blank == FB_BLANK_VSYNC_SUSPEND) {
 			dev_dbg(&mxt_data->client->dev, "##### UNBLANK SCREEN #####\n");
 			mxt_input_enable(mxt_data->input_dev);
 #ifdef TOUCH_WAKEUP_EVENT_RECORD
